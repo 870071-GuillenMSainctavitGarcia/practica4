@@ -23,7 +23,7 @@ void loop() {
   // 2. Si TÚ escribes texto en el Monitor Serie del ordenador para enviarlo al MÓVIL
   if (Serial.available()) {
     String mensajeAEnviar = Serial.readString();
-    
+    Serial.println(mensajeAEnviar); // Se muestra en el Monitor Serie del ordenador
     SerialBT.print(mensajeAEnviar); // Se envía por Bluetooth al móvil
   }
 }
