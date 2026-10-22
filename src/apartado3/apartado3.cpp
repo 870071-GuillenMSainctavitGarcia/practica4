@@ -1,10 +1,19 @@
 #include <ArduinoBLE.h>
 #include <Arduino_LSM9DS1.h>
 
-BLEService AcelService("180A"); // BLE LED Service
+
+#define ACCEL_CHAR_UUID "4755494c-4c45-4e6c-d104-768a12148888"
+#define SERVICE_UUID "4755494c-4c45-4e6c-d104-768a12141234"
+
+BLEService LedService("180A"); // BLE LED Service
+BLEService AccelService(SERVICE_UUID); // BLE Accelerometer Service
 
 // BLE LED Switch Characteristic - custom 128-bit UUID, read and writable by central
 BLEByteCharacteristic switchCharacteristic("2A57", BLERead | BLEWrite);
+BLEStringCharacteristic accelCharacteristic(ACCEL_CHAR_UUID, BLERead | BLENotify, 32);
+
+unsigned long prevMillis = 0;
+const long interval = 200;
 
 struct DatosAcel {
   float ax, ay, az;
@@ -14,7 +23,11 @@ volatile DatosAcel ultimaLectura;
 void setup() {
   Serial.begin(115200);
   while (!Serial);
-
+   
+  if (!IMU.begin()) {
+    Serial.println("¡Error al inicializar la IMU!");
+    while (1);
+  }
   // set LED's pin to output mode
   pinMode(LEDR, OUTPUT);
   pinMode(LEDG, OUTPUT);
@@ -35,21 +48,25 @@ void setup() {
 
   // set advertised local name and service UUID:
   BLE.setLocalName("Nano 33 BLE Sense");
-  BLE.setAdvertisedService(AcelService);
+  BLE.setAdvertisedService(LedService);
+  BLE.setAdvertisedService(AccelService);
 
   // add the characteristic to the service
-  AcelService.addCharacteristic(switchCharacteristic);
+  LedService.addCharacteristic(switchCharacteristic);
+  AccelService.addCharacteristic(accelCharacteristic);
 
   // add service
-  BLE.addService(AcelService);
+  BLE.addService(LedService);
+  BLE.addService(AccelService);
 
   // set the initial value for the characteristic:
   switchCharacteristic.writeValue(0);
+  accelCharacteristic.writeValue("Initial data");
 
   // start advertising
   BLE.advertise();
 
-  Serial.println("BLE LED Peripheral");
+  Serial.println("BLE LED Peripheral and Accelerometer Service");
 }
 
 void loop() {
@@ -95,20 +112,32 @@ void loop() {
             break;
         }
       }
-      if (switchCharacteristic.read()){
-         if (IMU.accelerationAvailable()) {
-            DatosAcel temp;
-            IMU.readAcceleration(temp.ax, temp.ay, temp.az);
-            
-            // Copia elemento a elemento para evitar el error con la variable volatile
-            noInterrupts();
-            ultimaLectura.ax = temp.ax;
-            ultimaLectura.ay = temp.ay;
-            ultimaLectura.az = temp.az;
-            interrupts();
+      
+         unsigned long currentMillis = millis();
+
+      // Temporizador para leer el sensor periódicamente
+      if (currentMillis - prevMillis >= interval) {
+        prevMillis = currentMillis;
+
+        float x, y, z;
+        if (IMU.accelerationAvailable()) {
+          IMU.readAcceleration(x, y, z);
+
+          // Formateamos los 3 ejes float en una cadena legible
+          char buffer[32];
+          snprintf(buffer, sizeof(buffer), "X:%.2f Y:%.2f Z:%.2f", x, y, z);
+
+          // ¡CLAVE! Actualiza el valor para LECTURA y envía la NOTIFICACIÓN automáticamente
+          accelCharacteristic.writeValue(buffer);
+
+          Serial.print("Notificando a nRF Connect: ");
+          Serial.println(buffer);
         }
       }
-    }
+      
+   
+    
+  }
 
     // when the central disconnects, print it out:
     Serial.print(F("Disconnected from central: "));
@@ -119,3 +148,4 @@ void loop() {
     digitalWrite(LEDB, HIGH);         // will turn the LED off
   }
 }
+
