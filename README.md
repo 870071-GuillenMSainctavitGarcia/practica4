@@ -20,6 +20,7 @@ Como cada apartado es un código distinto:
 
 ## Estructura del Proyecto
 
+```text
 Practica4/
 ├── src/
 │   ├── apartado1_3/           # Anuncio de publicidad BLE con UUID personalizado
@@ -34,7 +35,7 @@ Practica4/
 │       └── apartado5_2.cpp
 ├── platformio.ini             # Entornos de compilación y monitorización de PlatformIO
 └── README.md                  # Documentación principal
-
+```
 
 ## APARTADO 1
 
